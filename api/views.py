@@ -1,68 +1,98 @@
-from django.shortcuts import render
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.utils import timezone
-from .models import User, Book, Transaction
-from .serializers import UserSerializer, BookSerializer, TransactionSerializer
-
-
-# Create your views here.
-class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
+from django_filters.rest_framework import DjangoFilterBackend
+from .models import Book, User, Transaction
+from .serializers import BookSerializer, UserSerializer, TransactionSerializer
+from datetime import datetime, timedelta
 
 class BookViewSet(viewsets.ModelViewSet):
     queryset = Book.objects.all()
     serializer_class = BookSerializer
     permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        queryset = Book.objects.all()
-        available = self.request.query_params.get('available')
-        if available:
-            queryset = queryset.filter(copies_available__gt=0)
-        title = self.request.query_params.get('title')
-        if title:
-            queryset = queryset.filter(title__icontains=title)
-        author = self.request.query_params.get('author')
-        if author:
-            queryset = queryset.filter(author__icontains=author)
-        isbn = self.request.query_params.get('isbn')
-        if isbn:
-            queryset = queryset.filter(isbn__icontains=isbn)
-        return queryset
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['copies_available']
+    search_fields = ['title', 'author', 'isbn']
 
     @action(detail=True, methods=['post'])
     def checkout(self, request, pk=None):
         book = self.get_object()
         user = request.user
-        if book.copies_available > 0:
-            transaction = Transaction.objects.create(user=user, book=book)
-            book.copies_available -= 1
-            book.save()
-            return Response({'message': 'Book checked out successfully'}, status=status.HTTP_200_OK)
-        return Response({'message': 'No copies available'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if user already has this book checked out
+        existing_checkout = Transaction.objects.filter(
+            user=user,
+            book=book,
+            transaction_type=Transaction.CHECKOUT
+        ).exists()
+
+        if existing_checkout:
+            return Response(
+                {'error': 'You already have this book checked out'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if book.copies_available <= 0:
+            return Response(
+                {'error': 'No copies available'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Create checkout transaction
+        due_date = datetime.now().date() + timedelta(days=14)
+        Transaction.objects.create(
+            user=user,
+            book=book,
+            transaction_type=Transaction.CHECKOUT,
+            due_date=due_date
+        )
+
+        # Update book copies
+        book.copies_available -= 1
+        book.save()
+
+        return Response({'status': 'Book checked out successfully'})
 
     @action(detail=True, methods=['post'])
     def return_book(self, request, pk=None):
         book = self.get_object()
         user = request.user
-        try:
-            transaction = Transaction.objects.get(user=user, book=book, return_date__isnull=True)
-            transaction.return_date = timezone.now()
-            transaction.save()
-            book.copies_available += 1
-            book.save()
-            return Response({'message': 'Book returned successfully'}, status=status.HTTP_200_OK)
-        except Transaction.DoesNotExist:
-            return Response({'message': 'No active checkout found for this book'}, status=status.HTTP_400_BAD_REQUEST)
 
-class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
-    serializer_class = TransactionSerializer
+        # Check if user has this book checked out
+        checkout = Transaction.objects.filter(
+            user=user,
+            book=book,
+            transaction_type=Transaction.CHECKOUT
+        ).first()
+
+        if not checkout:
+            return Response(
+                {'error': 'You have not checked out this book'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Create return transaction
+        Transaction.objects.create(
+            user=user,
+            book=book,
+            transaction_type=Transaction.RETURN
+        )
+
+        # Update book copies
+        book.copies_available += 1
+        book.save()
+
+        return Response({'status': 'Book returned successfully'})
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        return Transaction.objects.filter(user=self.request.user)
+    @action(detail=True)
+    def borrowing_history(self, request, pk=None):
+        user = self.get_object()
+        transactions = Transaction.objects.filter(user=user)
+        serializer = TransactionSerializer(transactions, many=True)
+        return Response(serializer.data)
