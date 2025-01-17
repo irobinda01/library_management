@@ -6,10 +6,12 @@ from .views import (
   BookListCreateAPIView,
   BookDetailAPIView,
   BookCheckoutAPIView,
-  BookReturnAPIView
+  BookReturnAPIView,
+  LoginView
 )
 
 urlpatterns = [
+    path('login', LoginView.as_view(), name='user-login'),
     path('users', UserListCreateAPIView.as_view(), name='user-list-create'),
     path('users/<int:pk>', UserDetailAPIView.as_view(), name='user-detail'),
     path('users/<int:pk>/borrowing-history', BorrowingHistoryAPIView.as_view(), name='user-borrowing-history'),

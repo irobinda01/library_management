@@ -4,17 +4,53 @@ from rest_framework.views import APIView
 from rest_framework import status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.exceptions import AuthenticationFailed
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import User, Transaction, Book
 from .serializers import UserSerializer, TransactionSerializer, BookSerializer
 from datetime import datetime, timedelta
+import jwt, datetime
 
 # Create your views here.
 
+#LOGIN VIEWS
+class LoginView(APIView):
+
+  def post(self, request):
+    email = request.data.get('email')
+    password = request.data.get('password')
+
+    if not email or not password:
+      return Response({"error": "Email and password are required."}, status=400)
+
+    user = User.objects.filter(email=email).first()
+
+    if user is None:
+      raise AuthenticationFailed('User not found.')
+    
+    if not user.check_password(password):
+      raise AuthenticationFailed('Incorrect password!')
+    
+    payload = {
+      'id': user.id,
+      'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60),
+      'iat': datetime.datetime.utcnow()
+    }
+
+    token = jwt.encode(payload, 'secret', algorithm='HS256').decode('utf-8')
+
+    response = Response()
+    response.set_cookie(key='jwt', value=token, httponly=True)
+    response.data = {
+       'jwt': token
+    }
+
+    return response
+
 #USER VIEWS
 class UserListCreateAPIView(APIView):
-    #permission_classes = [IsAuthenticated]
+    #permission_classes = [AllowAny]
 
     def get(self, request):
         users = User.objects.all()

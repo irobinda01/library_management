@@ -64,8 +64,7 @@ python manage.py runserver
 ## API Endpoints
 
 ### Authentication
-- `POST /api/token`: Obtain JWT token
-- `POST /api/token/refresh`: Refresh JWT token
+- `POST /api/login`: Obtain JWT token
 
 ### Books
 - `GET /api/books`: List all books
