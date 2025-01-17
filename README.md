@@ -127,6 +127,7 @@ curl http://localhost:8000/api/books/?search=python \
     "id": int,
     "username": string,
     "email": string,
+    "password": string,
     "date_of_membership": date,
     "is_active": boolean
 }
