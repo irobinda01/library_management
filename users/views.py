@@ -92,7 +92,7 @@ class BookListCreateAPIView(APIView):
 
 
 class BookDetailAPIView(APIView):
-  permission_classes = [IsAuthenticated]
+  #permission_classes = [IsAuthenticated]
 
   def get(self, request, pk):
     book = get_object_or_404(Book, pk=pk)
@@ -114,7 +114,7 @@ class BookDetailAPIView(APIView):
 
 
 class BookCheckoutAPIView(APIView):
-  permission_classes = [IsAuthenticated]
+  #permission_classes = [IsAuthenticated]
 
   def post(self, request, pk):
     book = get_object_or_404(Book, pk=pk)
@@ -156,7 +156,7 @@ class BookCheckoutAPIView(APIView):
 
 
 class BookReturnAPIView(APIView):
-  permission_classes = [IsAuthenticated]
+  #permission_classes = [IsAuthenticated]
 
   def post(self, request, pk):
     book = get_object_or_404(Book, pk=pk)
