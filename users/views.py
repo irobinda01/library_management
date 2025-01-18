@@ -11,6 +11,7 @@ from .models import User, Transaction, Book
 from .serializers import UserSerializer, TransactionSerializer, BookSerializer
 from datetime import datetime, timedelta
 import jwt, datetime
+from django.http import Http404
 
 # Create your views here.
 
@@ -153,7 +154,11 @@ class BookCheckoutAPIView(APIView):
   #permission_classes = [IsAuthenticated]
 
   def post(self, request, pk):
-    book = get_object_or_404(Book, pk=pk)
+    try:
+      book = Book.objects.get(pk=pk)
+    except Book.DoesNotExist:
+      raise Http404("Book not found")
+    
     user = request.user
 
     # Check if user already has this book checked out
@@ -178,7 +183,7 @@ class BookCheckoutAPIView(APIView):
     # Create checkout transaction
     due_date = datetime.now().date() + timedelta(days=14)
     Transaction.objects.create(
-      user=user,
+      user=request.user,
       book=book,
       transaction_type=Transaction.CHECKOUT,
       due_date=due_date

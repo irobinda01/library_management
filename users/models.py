@@ -42,6 +42,7 @@ class Transaction(models.Model):
   TRANSACTION_TYPES = [(CHECKOUT, 'Checkout'), (RETURN, 'Return')]
 
   user = models.ForeignKey(User, on_delete=models.CASCADE)
+  book = models.ForeignKey(Book, on_delete=models.CASCADE, default=1)
   transaction_type = models.CharField(max_length=2, choices=TRANSACTION_TYPES)
   transaction_date = models.DateTimeField(auto_now_add=True)
   due_date = models.DateField(null=True, blank=True)
